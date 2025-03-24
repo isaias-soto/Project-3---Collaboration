@@ -12,7 +12,7 @@ This project is to assist educators, professionals, and job seekers in identifyi
 
 ## Data Sources
 
-- Job Postings Data: Information about the skills most commonly required in data science job listings.
+Job Postings Data: Information about the skills most commonly required in data science job listings from sites such as Glassdoor, Indeed, and ZipRecruiter. Mostly obtained using https://github.com/cullenwatson/JobSpy.
 
 Course Data: Information on course enrollments and the skills taught in each course, gathered from platforms such as Coursera, edX, and DataCamp.
 
@@ -23,6 +23,8 @@ Survey Data: Information gathered from data science experts' questionnaires that
 The following essential elements are present in this repository:
 
 Data: Unprocessed and unfiltered data from surveys, courses, and job advertisements.
+
+Non-analysis code: Files for scraping and tidying data.
 
 SQL scripts are SQL queries used for data aggregation and analysis, such as filtering, table joining, and key metric summarization.
 
