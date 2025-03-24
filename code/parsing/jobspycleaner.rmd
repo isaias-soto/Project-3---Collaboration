@@ -1,0 +1,166 @@
+---
+title: "Scraping and Tidying of JobSpy data"
+author: "Lawrence Yu"
+date: "`r Sys.Date()`"
+output: openintro::lab_report
+---
+
+```{r load-packages, message=FALSE}
+library(tidyverse)
+library(openintro)
+library(quanteda)
+library(tidyr)
+library(dplyr)
+library(slam)
+library(DBI)
+```
+
+
+### Overview
+
+JobSpy is a Python based package with powerful web scraping capabilities across multiple popular job boards. Information collected includes salary range, company name, and a description field which contains the bulk of the listing's details. This collection process needed to be performed multiple times because the package does not come with rate limiting features by default. This file contains the data wrangling to get the data into a form for our database.
+
+### JobSpy data collection and tidying
+
+Collect reused functions and constants for use later. This is the agreed upon word list to scan for skills programmatically. A flaw with scraping for the data is that it is hard to account for different webpages on different sites. This choice of skills reflects what we have seen emphasized more at this point in our careers and courses. 
+
+```{r constants-functions}
+# sample path, we ultimately pulled from the full lists and parsed out bad results 
+glassdoor_path <- '../glassdoor_raw.csv'
+word_list <- c('rstudio', 'teamwork', 'modeling', 'database', 'sql', 'r programming', 'r language', 'python', 'communication', 'r developer', 'data acquisition', 'predictive analytics', 'artificial intelligence', 'ai', 'machine learning')
+
+# frequency should be relative to the other skills since we can't get a precise count
+# may need to bin the values first?
+bins <- c(
+  'r_language',
+  'teamwork',
+  'modeling',
+  'database',
+  'sql',
+  'python',
+  'ai',
+  'data_acquisition',
+  'forecasting',
+  'communication'
+)
+
+categories <- c(
+  'technical',
+  'soft',
+  'technical',
+  'technical',
+  'technical',
+  'technical',
+  'technical',
+  'technical',
+  'technical',
+  'soft'
+)
+
+# no longer used in the final parse. prototype parse to isolate tokens
+get_word_tokens_text <- function(raw_text) {
+  word_freq <- 
+    mutate(text = tolower(raw_text)) %>%
+    mutate(text = str_remove_all(text, '[[:punct:]]')) %>%
+    mutate(tokens = str_split(text, '\\s+')) %>%
+    unnest(cols = c(tokens)) %>%
+    count(tokens) %>%
+    mutate(freq = n / sum(n)) %>%
+    arrange(desc(n))
+  
+  tolower(raw_text)
+  str_remove_all(text, '[[:punct:]]')
+  str_split(text, '\\s+')
+  return (word_freq)
+}
+
+# preferred version of description (from the job's original listing) parsing, able to group multiple words together as a phrase
+get_skills <- function(body) {
+  skills <- c()
+  keys <- corpus(body) %>% tokens(remove_punct = TRUE, remove_numbers = TRUE, remove_symbols = TRUE) %>% tokens_tolower()
+  skills <- kwic(keys, pattern = phrase(word_list))
+  return (paste(unique(skills$keyword), collapse = ','))
+}
+
+# quick conversion for non-annual salaries to maintain consistency. went with 2000 for hourly multiplier to assume a small loss for vacation time
+get_annual_salary <- function(interval, base) {
+  print(base)
+  salary <- base
+  if (!is.na(base)) {
+    if (interval == 'monthly') {
+      salary <- 12 * base
+    } else if (interval == 'hourly') {
+      salary <- 2000 * base
+    }
+  }
+  return (salary)
+}
+# test of binning for further analysis
+job_skills_df <- data.frame(
+  skill = bins,
+  category = categories
+)
+
+```
+
+Used different paths to save each cleaned csv.
+```{r jobspy-load}
+job_path <- '../jobs.csv'
+job_cleaner_path <- '../jobs_cleaner.csv'
+
+raw <- read.csv(
+  job_path,
+  sep = ','
+)
+```
+
+Early test to determine if keywords were available and derivable from certain parts of the scraped data
+```{r glassdoor-jobs}
+glassdoor_jobs <- raw %>% filter(site == 'glassdoor' & description != '')
+head(glassdoor_jobs$description)
+# clean and filter word tokens 
+word_freq <- get_word_tokens(glassdoor_jobs)
+word_freq
+
+word_freq %>% filter(tokens %in% word_list)
+```
+
+The skills function derived a skills list containing the matched skills words that we agreed to search for. This list was unlisted and added to our dataframe. The dataframe was modified to match the form that the database was expected for cleaner inserts. This process included consolidating the form of the salaries, collecting only the required columns, renaming them, before writing them to a csv for upload. The process of cleaning out missing data ultimately was performed outside of this file.
+```{r convert-csv}
+skills_list <- lapply(raw$description, get_skills)
+raw$skills <- unlist(skills_list)
+modified_df <- raw %>%
+  mutate(min_amount = 
+           case_when(
+             interval == 'monthly' ~ 12 * min_amount,
+             interval == 'weekly' ~ 50 * min_amount,
+             interval == 'hourly' ~ 2000 * min_amount,
+             TRUE ~ min_amount
+           ), max_amount = 
+           case_when(
+             interval == 'monthly' ~ 12 * max_amount,
+             interval == 'weekly' ~ 50 * max_amount,
+             interval == 'hourly' ~ 2000 * max_amount,
+             TRUE ~ max_amount
+           )) %>% 
+  select(title, company, location, date_posted, min_amount, max_amount, job_type, site, skills, description) %>%
+  rename(
+    Title = title,
+    Company = company,
+    Location = location,
+    DatePosted = date_posted,
+    SalaryFrom = min_amount,
+    SalaryTo = max_amount,
+    EmploymentType = job_type,
+    Source = site,
+    preferred_skills = skills
+  ) 
+  # mutate(across(everything(), ~ifelse(.=="", NA, as.character(.)))) %>%
+  # na.omit()
+
+write.csv(modified_df, file = 'job_spy_jobs_phrase.csv')
+```
+
+### Conclusions
+
+As the analysis was done elsewhere, the main purpose of this file was to handle one avenue from which we obtained our data. Some other sample code was used and sometimes saved here such as a concept of how our binning would work on the latter parts, but they were not put into the database.
