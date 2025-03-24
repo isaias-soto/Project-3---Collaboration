@@ -66,7 +66,7 @@ This project demonstrates teamwork as each member focused on particular data sou
 
 - **Isaias Soto** – Hosted a shared GitHub repository for collaboration and contributed course data scraping using BeautifulSoup. Owns the GitHub project folder that stored interim datasets and team files during development.
 
-- **Tanzil Ehsan & Woodelyne Durosier** – Retrieving collected data from MySQL database and creating visualizations and analysis, culiminating in the Pro3_visual_data.rmd file. 
+- **Tanzil Ehsan & Woodelyne Durosier** – Retrieved saved and cleaned data to create visualizations and analysis, culiminating in the Pro3_visual_data.rmd file. 
 
 
 ## How to Use This Repository
