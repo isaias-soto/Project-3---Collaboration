@@ -1,0 +1,371 @@
+
+# Load Packages
+
+```{r}
+library(tidyverse)
+library(RMySQL)
+library(DBI)
+library(readr)
+library(getPass)
+library(tidyr)
+library(readxl)
+library(stats)
+library(ggplot2)
+library(stringr)
+```
+
+# Data Collection
+
+```{r}
+
+applicants_data <- dbGetQuery(con, "SELECT * FROM applicants_data_clean")
+salaries_data <- dbGetQuery(con, "SELECT * FROM salaries_2025_data_clean")
+job_spy_data <- dbGetQuery(con, "SELECT * FROM job_spy_jobs_data_clean")
+nyc_jobs_data <- dbGetQuery(con, "SELECT * FROM nyc_jobs_utf8_data_clean")
+sods_survey_data <- dbGetQuery(con, "SELECT * FROM sods_survey_2023_data_clean")
+
+```
+
+# Inspecting the Datasets
+
+analyzing the structure and run head to view.
+
+```{r}
+
+str(applicants_data)
+str(salaries_data)
+str(job_spy_data)
+str(nyc_jobs_data)
+str(sods_survey_data)
+
+
+head(applicants_data)
+head(salaries_data)
+head(job_spy_data)
+head(nyc_jobs_data)
+head(sods_survey_data)
+
+```
+
+# updating rows with missing values, Then swaping missing values with mean values.
+
+eg(NA with UNKNOWN )
+
+```{r}
+applicants_data_clean <- applicants_data %>% drop_na()
+salaries_data_clean <- salaries_data %>% drop_na()
+job_spy_data_clean <- job_spy_data %>% drop_na()
+nyc_jobs_data_clean <- nyc_jobs_data %>% drop_na()
+sods_survey_data_clean <- sods_survey_data %>% drop_na()
+
+
+applicants_data_clean <- applicants_data %>% mutate_all(~ifelse(is.na(.), "Unknown", .))
+
+```
+
+# Attempt to update duplicate values
+
+```{r}
+applicants_data_clean <- applicants_data %>% distinct()
+salaries_data_clean <- salaries_data %>% distinct()
+job_spy_data_clean <- job_spy_data %>% distinct()
+nyc_jobs_data_clean <- nyc_jobs_data %>% distinct()
+sods_survey_data_clean <- sods_survey_data %>% distinct()
+
+```
+
+## Tranforming and Tidying Data:
+
+In this step we will be pivoting datasets for sods_survey_long, such as progamming languages, survey_related columns into long format.Then will check the few rows.
+
+```{r}
+
+sods_survey_long <- sods_survey_data_clean %>%
+  pivot_longer(cols = c("python", "r_programming", "java", "java_script", "c_c__", "c_", 
+                        "julia", "html_css", "bash_shell", "sql", "go", "php", "rust", "typescript"), 
+               names_to = "programming_language", 
+               values_to = "proficiency")
+
+
+
+sods_survey_survey_long <- sods_survey_data_clean %>%
+  pivot_longer(cols = c("what_are_you_using_generative_ai_for_select_all_that_apply__sele", 
+                        "has_your_company_already_hired_or_plan_on_hiring_any_of_the_foll",
+                        "what_topics__tools__or_skills_are_covered_in_your_courses_in_pre"), 
+               names_to = "survey_question", 
+               values_to = "response")
+
+
+head(sods_survey_long)
+
+head(sods_survey_survey_long)
+
+```
+
+This tidy version will assist on easily analyze the "most valued data skills.
+
+# Exploring Data Analysis
+
+will summarize the counts for each, then exibit the top skills
+
+```{r}
+
+skill_counts <- sods_survey_long %>%
+  group_by(programming_language) %>%
+  summarize(count = n())
+
+skill_counts %>%
+  arrange(desc(count)) %>%
+  head()
+
+
+```
+
+# Checking missing values
+
+```{r}
+
+summary(sods_survey_long)
+
+```
+
+# Resummarizing after updating missing values
+
+Group by programming language and proficiency to summarize the frequency of each proficiency level. And calculate level proficiency
+
+```{r}
+
+skill_proficiency_summary <- sods_survey_long %>%
+  group_by(programming_language) %>%
+  summarize(
+    avg_proficiency = mean(proficiency, na.rm = TRUE),  
+    count = n()  
+  )
+
+head(skill_proficiency_summary)
+
+```
+
+The command prompt a trequency table of the most refer to skills in the survey.
+
+# Visualize
+
+Now lets visualize the reports assistance to plug in the results. Will use a bar chart ot display the most valued data science skills based on the average profeciency by progamming language
+
+```{r}
+
+ggplot(skill_proficiency_summary, aes(x = reorder(programming_language, -avg_proficiency), y = avg_proficiency)) +
+  geom_bar(stat = "identity", fill = "seagreen") +
+  theme_minimal() +
+  labs(
+    title = "Average Proficiency by Programming Language",
+    x = "Programming Language",
+    y = "Average Proficiency (%)"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate the x-axis labels for readability
+
+```
+
+The Programming languages is dislpay in decending order for each frequency, wich base on the most valued skills.
+
+```{r}
+
+ggplot(sods_survey_long, aes(x = proficiency, fill = programming_language)) +
+  geom_histogram(binwidth = 1, position = "dodge") +
+  labs(title = "Proficiency Distribution by Programming Language",
+       x = "Proficiency Level", 
+       y = "Frequency") +
+  theme_minimal()
+
+```
+
+This Histogram provide in depth visualization for the frequency of various profeciency levels of each progamming language.
+
+# Handling Additional Missing value in Profeciency
+
+```{r}
+sods_survey_long$proficiency[is.na(sods_survey_long$proficiency)] <- median(sods_survey_long$proficiency, na.rm = TRUE)
+
+```
+
+# Now let see a summary of the data for salaries_data_clean, applicants_data_clean
+
+will check average salary by job type count applicant by gender
+
+```{r}
+avg_salary_by_job <- salaries_data_clean %>%
+  group_by(job_title) %>%
+  summarize(avg_salary = mean(salary_in_usd, na.rm = TRUE))
+
+applicant_count_by_gender <- applicants_data_clean %>%
+  group_by(gender) %>%
+  summarize(count = n())
+```
+
+# Define:
+
+a custom function to categorize job titles,for job titles that don't fit any category Apply this function to create a new job_category column View the data
+
+```{r}
+
+categorize_job_title <- function(title) {
+  if (grepl("Engineer|Developer|Software", title, ignore.case = TRUE)) {
+    return("Engineering")
+  } else if (grepl("Marketing|Manager|Brand", title, ignore.case = TRUE)) {
+    return("Marketing")
+  } else if (grepl("Sales|Representative|Account", title, ignore.case = TRUE)) {
+    return("Sales")
+  } else if (grepl("Analyst|Finance|Accounting", title, ignore.case = TRUE)) {
+    return("Finance")
+  } else {
+    return("Other")  
+  }
+}
+
+
+low_salary_data <- low_salary_data %>%
+  mutate(job_category = sapply(job_title, categorize_job_title))
+
+
+head(low_salary_data)
+
+```
+
+# Box plot for Low Salary Job Categories
+
+```{r}
+
+low_salary_grouped_box_plot <- ggplot(low_salary_data, aes(x = job_category, y = salary_in_usd)) +
+  geom_boxplot(fill = "skyblue", color = "orange", alpha = 0.7) +  # Create the box plot
+  theme_minimal() +
+  labs(
+    title = "Salary Distribution by Job Category (Low Salary)",
+    x = "Job Category",
+    y = "Salary in USD"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x-axis labels for better readability
+    axis.text.y = element_text(size = 8)  # Adjust y-axis text size
+  ) +
+  coord_flip()  # Flip coordinates to make the categories readable
+
+# Display the plot
+low_salary_grouped_box_plot
+
+
+```
+
+plot for High salary
+
+```{r}
+# Filter the data for high salary (salaries above the median)
+high_salary_data <- salaries_data_clean %>%
+  filter(salary_in_usd > median(salary_in_usd, na.rm = TRUE))  # Use median as the threshold
+# Create the box plot for high salary data
+high_salary_grouped_box_plot <- ggplot(high_salary_data, aes(x = experience_level, y = salary_in_usd)) +
+  geom_boxplot(fill = "red", color = "skyblue", alpha = 0.7) +  # Box plot with colors
+  theme_minimal() +
+  labs(
+    title = "Salary Distribution by Job Category (High Salary)",
+    x = "Job Category",
+    y = "Salary in USD"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x-axis labels for readability
+    axis.text.y = element_text(size = 10)  # Adjust y-axis text size for clarity
+  ) +
+  coord_flip()  # Flip coordinates to make the categories more readable
+
+head(high_salary_data)
+
+# Display the plot
+high_salary_grouped_box_plot
+
+```
+
+# Step 1: Calculate the average salary for each job title
+
+# Step 2: Get the top 10 job titles based on average salary
+
+# Sort in descending order to get the highest-paying titles
+
+# Step 3: Filter the original salary data to include only the top 10 job title
+
+# Step 4: Create an ungrouped box plot for the top 10 job titles and their salary distribution
+
+```{r}
+
+avg_salary_by_job <- salaries_data_clean %>%
+  group_by(job_title) %>%
+  summarize(avg_salary = mean(salary_in_usd, na.rm = TRUE)) 
+
+top_10_job_titles <- avg_salary_by_job %>%
+  top_n(10, avg_salary) %>%
+  arrange(desc(avg_salary))  
+
+top_10_salary_data <- salaries_data_clean %>%
+  filter(job_title %in% top_10_job_titles$job_title)
+
+
+high_salary_grouped_box_plot <- ggplot(top_10_salary_data, aes(x = job_title, y = salary_in_usd)) +
+  geom_boxplot(fill = "lightgreen", color = "darkgreen", alpha = 0.7) +  
+  theme_minimal() +
+  labs(
+    title = "Salary Distribution by Top 10 Job Titles (Ungrouped)",
+    x = "Job Title",
+    y = "Salary in USD"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x-axis labels for readability
+    axis.text.y = element_text(size = 10)  # Adjust y-axis text size for clarity
+  ) +
+  coord_flip() 
+
+```{r}
+high_salary_grouped_box_plot
+```
+
+# First, make sure that we have the right data from the survey long format.
+
+# We already created the `sods_survey_long` which has the skills in the 'programming_language' column.
+
+# Create a histogram to show the distribution of skills
+
+```{r}
+
+ggplot(sods_survey_long, aes(x = programming_language, fill = programming_language)) +
+  geom_bar(stat = "count", show.legend = FALSE) +  # geom_bar for count (frequency) of each skill
+  theme_minimal() +
+  labs(
+    title = "Distribution of Required Skills",
+    x = "Programming Language / Skill",
+    y = "Count of Occurrences"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1), 
+    axis.title.x = element_text(size = 12), 
+    axis.title.y = element_text(size = 12)) 
+
+
+```
+
+```{r}
+# Check if there are more than 3 unique categories for gender
+ggplot(applicant_count_by_gender, aes(x = gender, y = count, fill = gender)) +
+  geom_bar(stat = "identity") +  # Using stat = "identity" since count is already calculated
+  theme_minimal() +
+  labs(
+    title = "Applicant Count by Gender",
+    x = "Gender",
+    y = "Number of Applicants"
+  ) +
+  scale_fill_manual(values = c("lightblue", "lightpink", "lightgreen", "orange", "yellow", "purple")) +  # Add more colors if needed
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x-axis labels for better readability
+    axis.title.x = element_text(size = 12),  # Adjust x-axis title size
+    axis.title.y = element_text(size = 12)   # Adjust y-axis title size
+  )
+
+
+```
+
