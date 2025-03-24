@@ -52,9 +52,26 @@ Communication: Despite being crucial, communication skills are not as often give
 
 This project demonstrates teamwork as each member focused on particular data sources, analysis activities, or graphical elements to contribute. To guarantee efficient collaboration and progress, regular meetings and GitHub project management tools were employed.
 
+## 👩🏽‍💻 Team & Roles:
+
+- **Sheriann McLarty** – *Project Lead & ETL Engineer*  
+  Responsible for:
+  - Cleaning and standardizing all datasets  
+  - Designing and implementing the relational database (MySQL)  
+  - Building and running the ETL pipeline using Python  
+  - ER diagram creation and final documentation  
+  - Coordinating project scope and execution
+
+- **Lawrence Yu** – Provided a supplementary dataset scraped from Glassdoor, Google, ZipRecruiter, Indeed, and more, along with an R script to extract skill frequencies from job descriptions. Proposed a binning system to categorize skills (technical vs. soft) and assign a 10-point popularity score, which informed the `Skills` table’s `PopularityScore` metric.
+
+- **Isaias Soto** – Hosted a shared GitHub repository for collaboration and contributed course data scraping using BeautifulSoup. Owns the GitHub project folder that stored interim datasets and team files during development.
+
+- **Tanzil Ehsan & Woodelyne Durosier** – Retrieving collected data from MySQL database and creating visualizations and analysis, culiminating in the Pro3_visual_data.rmd file. 
+
+
 ## How to Use This Repository
 
-Go to https://github.com/Isaia_soto/project-3---collaboration/most-valuable-data-science-skills.git and clone the repository.
+1. Go to https://github.com/Isaia_soto/project-3---collaboration/most-valuable-data-science-skills.git and clone the repository.
 
 2. Install dependencies: Install the required libraries, such as sqlalchemy, seaborn, matplotlib, numpy, and pandas.
 
